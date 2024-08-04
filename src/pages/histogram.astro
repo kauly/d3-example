@@ -1,0 +1,179 @@
+---
+import Layout from "@layout/index.astro";
+---
+
+<Layout>
+  <div
+    class="flex flex-col space-y-2 justify-start items-start overflow-y-auto"
+  >
+    <select id="metric" class="p-2 rounded">
+      <option value="humidity" selected>Humidity</option>
+      <option value="temperature">Temperature</option>
+      <option value="dewPoint">Dew Point</option>
+      <option value="windSpeed">Wind Speed</option>
+      <option value="cloudCover">Cloud Cover</option>
+      <option value="ozone">Ozone</option>
+    </select>
+    <div id="chart"></div>
+  </div>
+</Layout>
+
+<script>
+  import * as d3 from "d3";
+
+  import data from "@utils/wheaterdata.json?url";
+  import type { WeatherType } from "@utils/types";
+
+  async function draw() {
+    // data
+    const dataset = (await d3.json(data)) as WeatherType[];
+
+    // dimensions
+    let dimensions = {
+      width: 800,
+      height: 400,
+      margin: 50,
+      containerWidth: 0,
+      containerHeight: 0,
+    };
+    dimensions.containerWidth = dimensions.width - dimensions.margin * 2;
+    dimensions.containerHeight = dimensions.height - dimensions.margin * 2;
+
+    // draw image
+    const svg = d3
+      .select("#chart")
+      .append("svg")
+      .attr("width", dimensions.width)
+      .attr("height", dimensions.height);
+
+    const container = svg
+      .append("g")
+      .attr(
+        "transform",
+        `translate(${dimensions.margin}, ${dimensions.margin})`,
+      );
+
+    const labelsGroup = container.append("g").classed("bar-labels", true);
+
+    const xAxisGroup = container
+      .append("g")
+      .style("transform", `translateY(${dimensions.containerHeight}px)`);
+
+    const meanLine = container.append("line").classed("mean-line", true);
+
+    function histogram(metric: string) {
+      const xAccessor = (d: WeatherType) => d.currently[metric];
+      const yAccessor = (d: WeatherType[]) => d.length;
+
+      const xScale = d3
+        .scaleLinear<number, number>(
+          d3.extent(dataset, xAccessor) as [number, number],
+          [0, dimensions.containerWidth],
+        )
+        .nice();
+
+      const bin = d3
+        .bin()
+        .domain(xScale.domain())
+        .value(xAccessor)
+        .thresholds(10);
+
+      const newDataset = bin(dataset);
+      const padding = 1;
+
+      const yScale = d3
+        .scaleLinear(
+          [0, d3.max(newDataset, yAccessor)],
+          [dimensions.containerHeight, 0],
+        )
+        .nice();
+
+      const exitTransition = d3.transition().duration(500);
+      const updateTransition = exitTransition.transition().duration(500);
+
+      labelsGroup
+        .selectAll("text")
+        .data(newDataset)
+        .join(
+          (enter) =>
+            enter
+              .append("text")
+              .attr(
+                "x",
+                (d) => xScale(d.x0) + (xScale(d.x1) - xScale(d.x0)) / 2,
+              )
+              .attr("y", dimensions.containerHeight)
+              .text(yAccessor),
+          (update) => update,
+          (exit) =>
+            exit
+              .transition(exitTransition)
+              .attr("y", dimensions.containerHeight)
+              .remove(),
+        )
+        .transition(updateTransition)
+        .attr("x", (d) => xScale(d.x0) + (xScale(d.x1) - xScale(d.x0)) / 2)
+        .attr("y", (d) => yScale(yAccessor(d)) - 10)
+        .text(yAccessor);
+
+      // draw rect
+      container
+        .selectAll("rect")
+        .data(newDataset)
+        .join(
+          (enter) =>
+            enter
+              .append("rect")
+              .attr("x", (d) => xScale(d.x0))
+              .attr("y", dimensions.containerHeight)
+              .attr("width", (d) =>
+                d3.max([0, xScale(d.x1) - xScale(d.x0) - padding]),
+              )
+              .attr("height", (d) => 0)
+              .attr("class", "fill-green-500"),
+
+          (update) => update,
+          (exit) =>
+            exit
+              .attr("class", "fill-red-500")
+              .transition(exitTransition)
+              .attr("y", dimensions.containerHeight)
+              .attr("height", 0)
+              .remove(),
+        )
+        .transition(updateTransition)
+        .attr("width", (d) =>
+          d3.max([0, xScale(d.x1) - xScale(d.x0) - padding]),
+        )
+        .attr(
+          "height",
+          (d) => dimensions.containerHeight - yScale(yAccessor(d)),
+        )
+        .attr("x", (d) => xScale(d.x0))
+        .attr("y", (d) => yScale(yAccessor(d)))
+        .attr("class", "fill-blue-500");
+
+      const mean = d3.mean(dataset, xAccessor);
+
+      meanLine
+        .raise()
+        .transition(updateTransition)
+        .attr("x1", xScale(mean))
+        .attr("y1", 0)
+        .attr("x2", xScale(mean))
+        .attr("y2", dimensions.containerHeight);
+      // draw axis
+      const xAxis = d3.axisBottom(xScale);
+
+      xAxisGroup.transition().call(xAxis);
+    }
+
+    d3.select("#metric").on("change", function (e) {
+      e.preventDefault();
+      histogram(this.value);
+    });
+    histogram("humidity");
+  }
+
+  draw();
+</script>

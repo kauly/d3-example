@@ -1,0 +1,147 @@
+---
+import Layout from "@layout/index.astro";
+---
+
+<Layout>
+  <div id="chart"></div>
+</Layout>
+
+<style>
+  .gauge {
+    width: 200px;
+    height: 200px;
+    margin: 0 auto;
+  }
+
+  .gauge-arc {
+    fill: none;
+    stroke: #ccc;
+    stroke-width: 10;
+  }
+
+  .gauge-needle {
+    fill: #999;
+    stroke: #333;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+
+  .gauge-label {
+    text-anchor: middle;
+    font-size: 12px;
+  }
+</style>
+
+<script>
+  // inspired by https://observablehq.com/@toja/radial-input
+  import * as d3 from "d3";
+
+  const dimensions = {
+    width: 364,
+    height: 364,
+    tickness: 56,
+    margin: 20,
+  };
+
+  const radialScale = d3.scaleLinear([0, 90], [0, 360]);
+
+  const svg = d3
+    .select("#chart")
+    .append("svg")
+    .attr("width", dimensions.width)
+    .attr("height", dimensions.height);
+
+  const arcContainer = svg
+    .append("g")
+    .attr(
+      "transform",
+      `translate(${dimensions.width / 2}, ${dimensions.height / 2})`,
+    );
+
+  arcContainer
+    .append("path")
+    .attr(
+      "d",
+      d3.arc()({
+        innerRadius: dimensions.width / 2.5 - dimensions.tickness,
+        outerRadius: dimensions.width / 2.5,
+        startAngle: 0,
+        endAngle: 2 * Math.PI,
+      }),
+    )
+    .attr("stroke", "#393A3F")
+    .attr("fill", "transparent");
+
+  // dashed circle
+  arcContainer
+    .append("circle")
+    .attr("r", dimensions.width / 2.5 - dimensions.tickness + 14)
+    .attr("fill", "transparent")
+    .attr("stroke", "#747C89")
+    .attr("stroke-dasharray", "20");
+
+  //"border" circle
+  arcContainer
+    .append("path")
+    .attr(
+      "d",
+      d3.arc()({
+        innerRadius: dimensions.width / 2.5,
+        outerRadius: dimensions.width / 2.5 + 12,
+        startAngle: 0,
+        endAngle: 2 * Math.PI,
+      }),
+    )
+    .attr("fill", "#393A3F")
+    .attr("stroke", "#747C89")
+    .attr("stroke-width", "1");
+  const ticksContainer = svg
+    .append("g")
+    .attr(
+      "transform",
+      `translate(${dimensions.width / 2}, ${dimensions.height / 2}) rotate(90)`,
+    );
+
+  const tickTexts = ticksContainer
+    .attr("text-anchor", "middle")
+    .attr("dominant-baseline", "central")
+    .attr("font-size", 10)
+    .attr("font-family", "sans-serif")
+    .selectAll("g")
+    .data(d3.range(0, 90, 10))
+    .join("g")
+    .attr(
+      "transform",
+      (d) =>
+        `rotate(${radialScale(d) - 90}) translate(0, ${
+          dimensions.width / 2.5
+        }) scale(-1,-1)`,
+    );
+  tickTexts
+    .append("text")
+    .attr("y", 28)
+    .text((d) => d);
+  tickTexts.append("line").attr("stroke", "#747C89").attr("y2", 18);
+
+  // needle
+  ticksContainer
+    .append("path")
+    .attr(
+      "transform",
+      `rotate(${radialScale(0) - 90}) translate(-14, ${
+        dimensions.width / 2.5 - dimensions.tickness + 12
+      }) scale(-1,-1)`,
+    )
+    .transition()
+    .attr(
+      "transform",
+      `rotate(${radialScale(30) - 90}) translate(-14, ${
+        dimensions.width / 2.5 - dimensions.tickness + 12
+      }) scale(-1,-1)`,
+    )
+    .attr("fill", "#FF132A")
+    .attr(
+      "d",
+      "M -14.2826 12.2785 C -13.801 12.4052 -13.3182 12.1177 -13.2029 11.6405 C -13.1863 11.5717 -13.1809 11.5026 -13.1787 11.4355 L -13.2661 -13.5285 C -13.2636 -13.7732 -13.4552 -13.9757 -13.6995 -13.9836 C -13.9406 -13.9934 -14.1394 -13.8033 -14.1413 -13.5613 L -14.9582 11.3031 C -15.0022 11.7426 -14.7217 12.1631 -14.2826 12.2785 Z",
+    );
+</script>

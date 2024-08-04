@@ -1,0 +1,91 @@
+---
+import Layout from "@layout/index.astro";
+---
+
+<Layout>
+  <div class="flex flex-col space-y-6">
+    <div id="chart1" class="flex flex-col space-y-2">
+      <h1 class="text-lg font-semibold">Linear Scale</h1>
+    </div>
+    <div id="chart2">
+      <h1 class="text-lg font-semibold">Quantize Scale</h1>
+    </div>
+    <div id="chart3">
+      <h1 class="text-lg font-semibold">Quantile Scale</h1>
+    </div>
+    <div id="chart4">
+      <h1 class="text-lg font-semibold">Threshold Scale</h1>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import * as d3 from "d3";
+  import data from "@utils/heatdata.json?url";
+
+  async function draw(elementId: string, scale: string) {
+    const dataset = (await d3.json(data)) as number[];
+    dataset.sort((a, b) => a - b);
+
+    let dimensions = {
+      width: 600,
+      height: 150,
+    };
+
+    const box = 30;
+
+    const svg = d3
+      .select(elementId)
+      .append("svg")
+      .attr("width", dimensions.width)
+      .attr("height", dimensions.height)
+      .attr("class", "bg-gray-200/20");
+
+    // Scales
+    let colorScale;
+    if (scale === "linear") {
+      colorScale = d3.scaleLinear<string, number>(
+        d3.extent(dataset) as [number, number],
+        ["white", "red"],
+      );
+    }
+    if (scale === "quantize") {
+      colorScale = d3.scaleQuantize<string, number>(
+        d3.extent(dataset) as [number, number],
+        ["white", "pink", "red"],
+      );
+    }
+
+    if (scale === "quantile") {
+      colorScale = d3.scaleQuantile<string, number>(dataset, [
+        "white",
+        "pink",
+        "red",
+      ]);
+    }
+
+    if (scale === "threshold") {
+      colorScale = d3.scaleThreshold([45200, 135600], d3.schemeReds[3]);
+    }
+
+    // Rectangles
+    svg
+      .append("g")
+      .attr("transform", "translate(2, 2)")
+      .attr("stroke", "#000")
+      .attr("fill", "#ddd")
+      .selectAll("rect")
+      .data(dataset)
+      .join("rect")
+      .attr("width", box - 3)
+      .attr("height", box - 3)
+      .attr("x", (d, i) => box * (i % 20)) // 0, 30, 60...
+      .attr("y", (d, i) => box * ((i / 20) | 0))
+      .attr("fill", colorScale);
+  }
+
+  draw("#chart1", "linear");
+  draw("#chart2", "quantize");
+  draw("#chart3", "quantile");
+  draw("#chart4", "threshold");
+</script>

@@ -1,0 +1,121 @@
+---
+import Layout from "@layout/index.astro";
+---
+
+<Layout>
+  <div id="chart">
+    <div id="tooltip" class="absolute top-0 bg-white shadow p-2 rounded">
+      <div class="">
+        Humidity: <span></span>
+      </div>
+      <div class="">
+        Temperature: <span></span>
+      </div>
+      <div></div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import * as d3 from "d3";
+
+  import data from "@utils/wheaterdata.json?url";
+  import type { WeatherType } from "@utils/types";
+
+  async function draw() {
+    // data
+    const dataset = (await d3.json(data)) as WeatherType[];
+    const xAccessor = (d: WeatherType) => d.currently.humidity;
+    const yAccessor = (d: WeatherType) => d.currently.apparentTemperature;
+
+    // dimensions
+    let dimensions = {
+      width: 800,
+      height: 800,
+      margin: {
+        top: 50,
+        bottom: 50,
+        left: 50,
+        right: 50,
+      },
+      containerWidth: 0,
+      containerHeight: 0,
+    };
+    dimensions.containerWidth =
+      dimensions.width - dimensions.margin.left - dimensions.margin.right;
+    dimensions.containerHeight =
+      dimensions.height - dimensions.margin.top - dimensions.margin.bottom;
+
+    // scales
+    const xScale = d3
+      .scaleLinear()
+      .domain(d3.extent(dataset, xAccessor) as [number, number])
+      .rangeRound([0, dimensions.containerWidth])
+      .clamp(true);
+
+    const yScale = d3
+      .scaleLinear()
+      .domain(d3.extent(dataset, yAccessor) as [number, number])
+      .rangeRound([dimensions.containerHeight, 0])
+      .nice()
+      .clamp(true);
+
+    //draw image
+    const svg = d3
+      .select("#chart")
+      .append("svg")
+      .attr("width", dimensions.width)
+      .attr("height", dimensions.height);
+
+    const container = svg
+      .append("g")
+      .attr(
+        "transform",
+        `translate(${dimensions.margin.left}, ${dimensions.margin.top})`,
+      );
+
+    // draw circles
+    container
+      .selectAll("circle")
+      .data(dataset)
+      .join("circle")
+      .attr("cx", (d) => xScale(xAccessor(d)))
+      .attr("cy", (d) => yScale(yAccessor(d)))
+      .attr("r", 5)
+      .attr("class", "fill-blue-600");
+
+    // axes
+    const xAxis = d3
+      .axisBottom(xScale)
+      .ticks(4)
+      .tickFormat((d) => `${d * 100}%`);
+
+    const xAxisGroup = container
+      .append("g")
+      .call(xAxis)
+      .style("transform", `translateY(${dimensions.containerHeight}px)`)
+      .classed("axis", true);
+
+    xAxisGroup
+      .append("text")
+      .attr("x", dimensions.containerWidth / 2)
+      .attr("y", dimensions.margin.bottom - 5)
+      .attr("fill", "black")
+      .text("Humidity");
+
+    const yAxis = d3.axisLeft(yScale);
+
+    const yAxisGroup = container.append("g").call(yAxis).classed("axis", true);
+
+    yAxisGroup
+      .append("text")
+      .attr("fill", "black")
+      .attr("x", -dimensions.containerHeight / 2)
+      .attr("y", -dimensions.margin.left + 13)
+      .html("Temperature F&deg;")
+      .style("transform", "rotate(270deg)")
+      .style("text-anchor", "middle");
+  }
+
+  draw();
+</script>
